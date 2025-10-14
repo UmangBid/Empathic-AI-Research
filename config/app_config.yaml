@@ -1,0 +1,94 @@
+# Application Configuration
+# This file controls all settings for the Empathic AI Research Platform
+
+ 
+# APPLICATION SETTINGS
+ 
+app:
+  name: "Empathic AI Research Platform"
+  version: "1.0.0"
+  debug: false  # Set to true for detailed error messages during development
+
+ 
+# CONVERSATION PARAMETERS
+ 
+conversation:
+  max_messages: 10  # Maximum number of messages per conversation
+  session_timeout: 3600  # Session timeout in seconds (1 hour)
+  auto_save: true  # Automatically save each message to database
+  show_message_counter: true  # Display "Message X of 10" to participants
+
+ 
+# API CONFIGURATION
+ 
+api:
+  provider: "openai"  # Using only OpenAI ChatGPT API
+  model: "gpt-4.1-2025-04-14"  # OpenAI model to use (gpt-4.1-2025-04-14, gpt-4o, etc.)
+  temperature: 0.7  # Response randomness (0.0-1.0, higher = more creative)
+  max_tokens: 500  # Maximum length of bot responses
+  timeout: 30  # API request timeout in seconds
+  retry_attempts: 3  # Number of retries if API fails
+
+ 
+# BOT ASSIGNMENT
+ 
+assignment:
+  method: "random"  # Options: "random", "sequential", "manual"
+  equal_distribution: true  # Ensure equal number of participants per bot type
+  blind_study: true  # Participants don't know which bot type they got
+
+ 
+# DATABASE SETTINGS
+ 
+database:
+  path: "data/database/conversations.db"  # SQLite database location
+  backup_enabled: true  # Enable automatic backups
+  backup_frequency: "daily"  # Options: "daily", "hourly", "after_each"
+  csv_export_enabled: true  # Enable CSV backup
+  csv_path: "data/exports/all_conversations.csv"
+
+ 
+# CRISIS DETECTION & SAFETY
+ 
+safety:
+  crisis_detection_enabled: true  # Monitor for crisis keywords
+  crisis_keywords:  # Words/phrases that trigger safety response
+    - "suicide"
+    - "kill myself"
+    - "end it all"
+    - "want to die"
+    - "no reason to live"
+    - "better off dead"
+  auto_flag: true  # Automatically flag conversations with crisis keywords
+  emergency_resources:  # Crisis resources shown to participants
+    - "988 Suicide & Crisis Lifeline (call or text 988)"
+    - "Crisis Text Line (text HOME to 741741)"
+    - "Emergency: Call 911"
+
+ 
+# USER INTERFACE SETTINGS
+ 
+ui:
+  theme: "clean"  # UI theme
+  show_typing_indicator: true  # Show "bot is typing..." indicator
+  message_animation: true  # Animate new messages
+  mobile_friendly: true  # Optimize for mobile devices
+  
+ 
+# LOGGING & MONITORING
+ 
+logging:
+  enabled: true
+  level: "INFO"  # Options: "DEBUG", "INFO", "WARNING", "ERROR"
+  log_path: "data/logs/app_logs/"
+  error_log_path: "data/logs/error_logs/"
+  crisis_flag_path: "data/logs/crisis_flags/"
+
+ 
+# RESEARCHER DASHBOARD
+
+dashboard:
+  password_protected: false  # Set to true to require password
+  admin_password: ""  # Set admin password if protection enabled
+  show_real_time_stats: true  # Display live conversation statistics
+  export_formats: ["csv", "excel", "json"]  # Available export formats
