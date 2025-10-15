@@ -155,6 +155,13 @@ class BotManager:
             from openai import OpenAI
             api_key = os.getenv("OPENAI_API_KEY")
             if not api_key:
+                # Fallback to Streamlit secrets when running on Streamlit Cloud
+                try:
+                    import streamlit as st  # type: ignore
+                    api_key = st.secrets.get("OPENAI_API_KEY") if hasattr(st, "secrets") else None
+                except Exception:
+                    api_key = None
+            if not api_key:
                 raise ValueError("OPENAI_API_KEY not set")
             self._client = OpenAI(api_key=api_key)
             self._provider = "openai"

@@ -15,10 +15,24 @@ This platform enables researchers to compare four distinct empathy approaches in
 ### Prerequisites
 - Python 3.8 or higher
 - pip (Python package manager)
-- API key from OpenAI or Anthropic
+- API key from OpenAI
 
 ### Installation
 
 1. **Clone or download the project**
 ```bash
 cd empathic_ai_research
+
+https://empathic-ai-research-bxpwkxy7gbmbpxvlwybpp9.streamlit.app/
+
+streamlit run src/app.py  #Run the participant chat app
+
+streamlit run admin_app.py  #Run the admin dashboard (local)
+
+python scripts\setup_database.py --verify  #Verify remote DB (Postgres/Neon)
+
+python .\check_database.py  #Verify local SQLite (when no DATABASE_URL is set)
+
+python .\tests\test_async_db.py  #Async Postgres connectivity sanity check (Neon)
+
+python scripts\setup_database.py --reset --yes  #Local SQLite reset

@@ -157,6 +157,16 @@ def main():
         # Display chat history
         chat_interface.display_chat_history(st.session_state.messages)
 
+        # Allow participant to end the conversation early
+        early_end = st.button("End Conversation", help="Finish now and proceed to the closing page")
+        if early_end:
+            # Mark participant as completed in database and end the session
+            db_manager.mark_participant_completed(st.session_state.participant_id)
+            bot_manager.end_session(st.session_state.session_id, completed=True)
+            st.session_state.conversation_active = False
+            st.session_state.conversation_complete = True
+            st.rerun()
+
         # Ensure BotManager has the session (Streamlit reruns recreate BotManager)
         try:
             sess_id = st.session_state.session_id
@@ -198,14 +208,15 @@ def main():
             # Increment message counter IN SESSION STATE
             st.session_state.current_message_num += 1
             
+            # Use session state message number for this turn BEFORE using it
+            message_num = st.session_state.current_message_num
+
             # Add user message to display
             st.session_state.messages.append({
                 'role': 'user',
-                'content': user_input
+                'content': user_input,
+                'message_num': message_num
             })
-            
-            # Use session state message number for database
-            message_num = st.session_state.current_message_num
             
             # Save user message to database
             db_manager.save_message(
@@ -266,14 +277,6 @@ def main():
 
 
 if __name__ == "__main__":
-    # Set page config
-    st.set_page_config(
-        page_title="Mental Health Support Study",
-        page_icon="💬",
-        layout="centered",
-        initial_sidebar_state="expanded"
-    )
-    
     # Run main application
     try:
         main()

@@ -133,15 +133,20 @@ class ChatInterface:
                 )
     
     
-    def display_chat_message(self, role: str, content: str):
+    def display_chat_message(self, role: str, content: str, turn: int | None = None, maximum: int | None = None):
         """
         Display a single chat message.
         
         Args:
             role: "user" or "assistant"
             content: Message text
+            turn: Optional turn number (for user messages)
+            maximum: Optional maximum turns
         """
         with st.chat_message(role):
+            # Show a small turn label for user messages only
+            if role == "user" and turn is not None and maximum:
+                st.caption(f"Turn {turn} of {maximum}")
             st.markdown(content)
     
     
@@ -153,7 +158,10 @@ class ChatInterface:
             messages: List of message dictionaries with 'role' and 'content'
         """
         for message in messages:
-            self.display_chat_message(message['role'], message['content'])
+            role = message.get('role')
+            content = message.get('content')
+            turn = message.get('message_num') if role == 'user' else None
+            self.display_chat_message(role, content, turn=turn, maximum=self.max_messages)
     
     
     def get_user_input(self, disabled: bool = False) -> str:
