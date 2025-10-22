@@ -233,13 +233,23 @@ class ChatInterface:
         
         # Optional feedback form
         with st.expander("Optional: Share Feedback"):
-            st.text_area(
-                "How was your experience with the AI?",
-                key="feedback",
+            # Use widget-specific keys to avoid mutating their session_state entries programmatically
+            rating = st.slider(
+                "How helpful was this chat? (1 = Not at all, 5 = Very helpful)",
+                1, 5, 4,
+                key="feedback_rating_input"
+            )
+            text = st.text_area(
+                "Anything you'd like to share?",
+                key="feedback_text_input",
                 help="Your feedback helps improve the system"
             )
-            
+
             if st.button("Submit Feedback"):
+                # Store under separate keys so we don't conflict with widget-managed keys
+                st.session_state.submitted_feedback = True
+                st.session_state.submitted_feedback_rating = rating
+                st.session_state.submitted_feedback_text = text
                 st.success("Thank you for your feedback!")
     
     

@@ -133,6 +133,17 @@ def main():
     # STAGE 2: CONVERSATION COMPLETE
     if st.session_state.conversation_complete:
         chat_interface.display_completion_page(st.session_state.participant_id)
+        # If participant submitted feedback, persist it exactly once
+        try:
+            if st.session_state.get('submitted_feedback') and not st.session_state.get('feedback_saved'):
+                db_manager.set_participant_feedback(
+                    st.session_state.participant_id,
+                    st.session_state.get('submitted_feedback_text'),
+                    st.session_state.get('submitted_feedback_rating')
+                )
+                st.session_state.feedback_saved = True
+        except Exception:
+            pass
         return
     
     # STAGE 3: ACTIVE CONVERSATION

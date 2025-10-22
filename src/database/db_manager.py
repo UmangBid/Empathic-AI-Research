@@ -144,6 +144,26 @@ class DatabaseManager:
         finally:
             session.close()
 
+    def set_participant_feedback(self, participant_id: str, text: Optional[str], rating: Optional[int] = None) -> None:
+        """Store optional feedback for a participant and timestamp it."""
+        session = self.get_session()
+        try:
+            p = session.query(Participant).filter_by(id=participant_id).first()
+            if not p:
+                return
+            p.feedback_text = (text or '').strip() or None
+            try:
+                p.feedback_rating = int(rating) if rating is not None else None
+            except Exception:
+                p.feedback_rating = None
+            p.feedback_time = datetime.utcnow()
+            session.commit()
+        except Exception:
+            session.rollback()
+            raise
+        finally:
+            session.close()
+
     def _apply_migrations(self):
         """Lightweight, safe migrations: add columns if missing."""
         try:
@@ -154,6 +174,19 @@ class DatabaseManager:
                 with self.engine.connect() as conn:
                     # Works for Postgres and SQLite
                     conn.execute(text('ALTER TABLE participants ADD COLUMN prolific_id VARCHAR'))
+                    conn.commit()
+            # Feedback columns (all nullable, additive)
+            if 'feedback_text' not in cols:
+                with self.engine.connect() as conn:
+                    conn.execute(text('ALTER TABLE participants ADD COLUMN feedback_text TEXT'))
+                    conn.commit()
+            if 'feedback_rating' not in cols:
+                with self.engine.connect() as conn:
+                    conn.execute(text('ALTER TABLE participants ADD COLUMN feedback_rating INTEGER'))
+                    conn.commit()
+            if 'feedback_time' not in cols:
+                with self.engine.connect() as conn:
+                    conn.execute(text('ALTER TABLE participants ADD COLUMN feedback_time TIMESTAMP'))
                     conn.commit()
         except Exception:
             # If anything fails (e.g., permissions), we ignore; Base metadata still works for new DBs

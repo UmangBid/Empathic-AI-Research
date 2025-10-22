@@ -42,6 +42,11 @@ class Participant(Base):
     
     # External identifier from Prolific (optional)
     prolific_id = Column(String, nullable=True)
+
+    # Optional feedback at completion
+    feedback_text = Column(Text, nullable=True)
+    feedback_rating = Column(Integer, nullable=True)
+    feedback_time = Column(DateTime, nullable=True)
     
     # Relationship: One participant has many messages
     messages = relationship("Message", back_populates="participant", cascade="all, delete-orphan")

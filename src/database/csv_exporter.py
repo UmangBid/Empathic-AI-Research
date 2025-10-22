@@ -139,7 +139,10 @@ class CSVExporter:
                 'duration_minutes': round(duration_minutes, 2) if duration_minutes else None,
                 'total_messages': p.total_messages,
                 'completed': p.completed,
-                'crisis_flagged': p.crisis_flagged
+                'crisis_flagged': p.crisis_flagged,
+                'feedback_rating': getattr(p, 'feedback_rating', None),
+                'feedback_time_az': fmt_az(getattr(p, 'feedback_time', None), "%Y-%m-%d %H:%M:%S"),
+                'feedback_text': getattr(p, 'feedback_text', None)
             }
             rows.append(row)
         

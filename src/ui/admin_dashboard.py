@@ -44,7 +44,7 @@ class AdminDashboard:
         # Sidebar navigation
         page = st.sidebar.selectbox(
             "Navigation",
-            ["Overview", "Participants", "Data Export", "Crisis Flags", "Bot Comparison"]
+            ["Overview", "Participants", "Data Export", "Crisis Flags", "Bot Comparison", "Feedback"]
         )
         
         # Display selected page
@@ -58,6 +58,8 @@ class AdminDashboard:
             self.display_crisis_flags()
         elif page == "Bot Comparison":
             self.display_bot_comparison()
+        elif page == "Feedback":
+            self.display_feedback()
     
     
     def display_overview(self):
@@ -324,6 +326,37 @@ class AdminDashboard:
                 st.bar_chart(crisis_df)
         else:
             st.info("No data available for comparison yet.")
+
+    def display_feedback(self):
+        """Show participant feedback entries (if any)."""
+        st.header("Participant Feedback")
+        session = self.db_manager.get_session()
+        try:
+            from src.database.models import Participant
+            rows = (
+                session.query(Participant)
+                .filter((Participant.feedback_text.isnot(None)) | (Participant.feedback_rating.isnot(None)))
+                .order_by(Participant.feedback_time.desc().nullslast())
+                .all()
+            )
+            if not rows:
+                st.info("No feedback submitted yet.")
+                return
+            data = []
+            for p in rows:
+                data.append({
+                    'Participant ID': p.id,
+                    'Prolific ID': getattr(p, 'prolific_id', None) or '',
+                    'Bot Type': p.bot_type,
+                    'Feedback Rating': p.feedback_rating if getattr(p, 'feedback_rating', None) is not None else '',
+                    'Feedback Time (AZ)': fmt_az(getattr(p, 'feedback_time', None), "%Y-%m-%d %H:%M:%S"),
+                    'Feedback Text': getattr(p, 'feedback_text', '') or ''
+                })
+            import pandas as pd
+            df = pd.DataFrame(data)
+            st.dataframe(df, use_container_width=True, hide_index=True)
+        finally:
+            session.close()
 
 
 def run_admin_dashboard(db_manager: DatabaseManager):
