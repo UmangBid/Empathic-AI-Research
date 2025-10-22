@@ -25,7 +25,8 @@ api:
   provider: "openai"  # Using only OpenAI ChatGPT API
   model: "gpt-4.1-2025-04-14"  # OpenAI model to use (gpt-4.1-2025-04-14, gpt-4o, etc.)
   temperature: 0.7  # Response randomness (0.0-1.0, higher = more creative)
-  max_tokens: 500  # Maximum length of bot responses
+  max_tokens: 220  # Soft ceiling; streaming + truncation enforces ~150 words
+  max_words: 150  # Enforce ~150-word responses in post-processing
   timeout: 30  # API request timeout in seconds
   retry_attempts: 3  # Number of retries if API fails
 

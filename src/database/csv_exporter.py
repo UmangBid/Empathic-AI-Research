@@ -6,6 +6,7 @@ Handles exporting conversation data from database to CSV files for research anal
 import csv
 import pandas as pd
 from datetime import datetime
+from src.utils.timezone import fmt_az, now_az
 from typing import List, Dict
 import os
 
@@ -50,7 +51,7 @@ class CSVExporter:
         """
         # Generate filename if not provided
         if filename is None:
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            timestamp = now_az().strftime("%Y%m%d_%H%M%S")
             filename = f"all_conversations_{timestamp}.csv"
         
         filepath = os.path.join(self.export_dir, filename)
@@ -82,7 +83,7 @@ class CSVExporter:
                 'message_num': msg.message_num,
                 'sender': msg.sender,
                 'message_text': msg.content,
-                'timestamp': msg.timestamp.strftime("%Y-%m-%d %H:%M:%S"),
+                'timestamp_az': fmt_az(msg.timestamp, "%Y-%m-%d %H:%M:%S"),
                 'contains_crisis_keyword': msg.contains_crisis_keyword,
                 'conversation_completed': participant.completed if participant else False
             }
@@ -112,7 +113,7 @@ class CSVExporter:
         """
         # Generate filename if not provided
         if filename is None:
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            timestamp = now_az().strftime("%Y%m%d_%H%M%S")
             filename = f"participant_summary_{timestamp}.csv"
         
         filepath = os.path.join(self.export_dir, filename)
@@ -133,8 +134,8 @@ class CSVExporter:
                 'participant_id': p.id,
                 'prolific_id': getattr(p, 'prolific_id', None),
                 'bot_type': p.bot_type,
-                'start_time': p.start_time.strftime("%Y-%m-%d %H:%M:%S"),
-                'end_time': p.end_time.strftime("%Y-%m-%d %H:%M:%S") if p.end_time else None,
+                'start_time_az': fmt_az(p.start_time, "%Y-%m-%d %H:%M:%S"),
+                'end_time_az': fmt_az(p.end_time, "%Y-%m-%d %H:%M:%S") if p.end_time else None,
                 'duration_minutes': round(duration_minutes, 2) if duration_minutes else None,
                 'total_messages': p.total_messages,
                 'completed': p.completed,
@@ -165,7 +166,7 @@ class CSVExporter:
         """
         # Generate filename if not provided
         if filename is None:
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            timestamp = now_az().strftime("%Y%m%d_%H%M%S")
             filename = f"crisis_flags_{timestamp}.csv"
         
         filepath = os.path.join(self.export_dir, filename)
@@ -186,7 +187,7 @@ class CSVExporter:
                     'message_id': flag.message_id,
                     'message_text': message.content if message else 'N/A',
                     'keyword_detected': flag.keyword_detected,
-                    'timestamp': flag.timestamp.strftime("%Y-%m-%d %H:%M:%S"),
+                    'timestamp_az': fmt_az(flag.timestamp, "%Y-%m-%d %H:%M:%S"),
                     'reviewed': flag.reviewed,
                     'notes': flag.notes if flag.notes else ''
                 }
@@ -219,7 +220,7 @@ class CSVExporter:
         """
         # Generate filename if not provided
         if filename is None:
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            timestamp = now_az().strftime("%Y%m%d_%H%M%S")
             filename = f"bot_comparison_{timestamp}.csv"
         
         filepath = os.path.join(self.export_dir, filename)

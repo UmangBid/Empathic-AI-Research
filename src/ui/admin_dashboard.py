@@ -7,6 +7,7 @@ import streamlit as st
 import pandas as pd
 from typing import Dict
 from datetime import datetime
+from src.utils.timezone import fmt_az
 
 from src.database.db_manager import DatabaseManager
 from src.database.models import Message
@@ -129,7 +130,7 @@ class AdminDashboard:
                 'Completed': '✓' if p.completed else '✗',
                 'Crisis': '⚠' if p.crisis_flagged else '',
                 'Duration (min)': f"{duration:.1f}" if duration else 'N/A',
-                'Start Time': p.start_time.strftime("%Y-%m-%d %H:%M")
+                'Start Time (AZ)': fmt_az(p.start_time, "%Y-%m-%d %H:%M")
             })
         
         df = pd.DataFrame(data)
@@ -165,7 +166,7 @@ class AdminDashboard:
         
         for msg in messages:
             sender_label = "👤 User" if msg.sender == "user" else "🤖 Bot"
-            timestamp = msg.timestamp.strftime("%Y-%m-%d %H:%M:%S") if msg.timestamp else ""
+            timestamp = fmt_az(msg.timestamp, "%Y-%m-%d %H:%M:%S") if msg.timestamp else ""
             
             with st.expander(f"{sender_label} - Message {msg.message_num} ({timestamp})"):
                 st.write(msg.content)
@@ -235,7 +236,7 @@ class AdminDashboard:
         # Display each flag
         for flag in unreviewed_flags:
             with st.expander(f"Participant {flag.participant_id} - {flag.keyword_detected}"):
-                st.write(f"**Timestamp:** {flag.timestamp.strftime('%Y-%m-%d %H:%M:%S')}")
+                st.write(f"**Timestamp (AZ):** {fmt_az(flag.timestamp, '%Y-%m-%d %H:%M:%S')}")
                 st.write(f"**Keyword Detected:** {flag.keyword_detected}")
                 
                 # Get the message content

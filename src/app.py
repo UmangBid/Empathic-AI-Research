@@ -94,6 +94,25 @@ def main():
             st.session_state.session_id = session_data['session_id']
             st.session_state.participant_id = session_data['participant_id']
             st.session_state.bot_type = session_data['bot_type']
+
+            # If a Prolific/external ID is present and we have a prior participant,
+            # keep the same bot_type to ensure modality stickiness between conversations.
+            try:
+                ext_id = (st.session_state.get('prolific_id') or '').strip()
+                if ext_id:
+                    prior = db_manager.get_participant_by_prolific(ext_id)
+                    if prior and getattr(prior, 'bot_type', None) in ("cognitive", "emotional", "motivational", "control"):
+                        # Override both session state and the in-memory BotManager session
+                        st.session_state.bot_type = prior.bot_type
+                        try:
+                            sid = st.session_state.session_id
+                            if sid in getattr(bot_manager, 'sessions', {}):
+                                bot_manager.sessions[sid]['bot_type'] = prior.bot_type
+                        except Exception:
+                            pass
+            except Exception:
+                # Non-fatal; fall back to the randomly assigned bot_type
+                pass
             st.session_state.show_welcome = False
             st.session_state.conversation_active = True
             # Reset conversation UI state
@@ -174,7 +193,7 @@ def main():
                 # Rehydrate bot session from session_state
                 hist = [
                     {"role": m.get("role"), "content": m.get("content")}
-                    for m in st.session_state.messages[-20:]
+                    for m in st.session_state.messages[-10:]
                     if isinstance(m, dict) and m.get("role") in ("user", "assistant")
                 ]
                 bot_manager.sessions[sess_id] = {
@@ -225,49 +244,78 @@ def main():
                 'user',
                 user_input
             )
-            
-            # Get bot response
+
+            # Immediately render the user's message so it appears without waiting
             try:
-                response_data = bot_manager.get_bot_response(
-                    session_id=st.session_state.session_id,
-                    user_message=user_input,
-                    message_num=message_num
-                )
-                
-                bot_response = response_data['bot_response']
-                
-                # Add bot message to display
-                st.session_state.messages.append({
-                    'role': 'assistant',
-                    'content': bot_response
-                })
-                
-                # Save bot message to database
-                saved_msg = db_manager.save_message(
-                    st.session_state.participant_id,
-                    message_num,
-                    'bot',
-                    bot_response,
-                    contains_crisis_keyword=response_data['crisis_detected']
-                )
-                
-                # Show crisis warning if detected
-                if response_data['crisis_detected']:
-                    # Create a crisis flag record for admin review
+                # Reuse existing UI helper to include turn caption
+                max_messages = config['conversation']['max_messages']
+                chat_interface.display_chat_message('user', user_input, turn=message_num, maximum=max_messages)
+            except Exception:
+                # Fallback to direct rendering if helper fails for any reason
+                with st.chat_message("user"):
+                    st.markdown(user_input)
+            
+            # Get bot response (with crisis check and streaming for lower perceived latency)
+            try:
+                # Crisis check first
+                is_crisis, detected_keyword, crisis_text = bot_manager.check_crisis(user_input)
+                if is_crisis:
+                    bot_response = crisis_text or ""
+
+                    # Add bot message to display immediately
+                    st.session_state.messages.append({
+                        'role': 'assistant',
+                        'content': bot_response
+                    })
+
+                    # Save bot message to database and create crisis flag
+                    saved_msg = db_manager.save_message(
+                        st.session_state.participant_id,
+                        message_num,
+                        'bot',
+                        bot_response,
+                        contains_crisis_keyword=True
+                    )
                     try:
-                        keyword = response_data.get('detected_keyword') or 'crisis'
                         msg_id = getattr(saved_msg, 'id', None)
                         if msg_id:
                             db_manager.create_crisis_flag(
                                 participant_id=st.session_state.participant_id,
                                 message_id=msg_id,
-                                keyword_detected=str(keyword)
+                                keyword_detected=str(detected_keyword or 'crisis')
                             )
                     except Exception:
-                        # Non-fatal; still show warning
                         pass
                     st.warning("⚠ Crisis resources have been provided in the response above.")
-                
+                else:
+                    # Stream assistant response for faster feedback
+                    with st.chat_message("assistant"):
+                        placeholder = st.empty()
+                        collected = ""
+                        for chunk in bot_manager.stream_bot_response(
+                            st.session_state.session_id,
+                            user_input
+                        ):
+                            collected += chunk
+                            # Update UI incrementally
+                            placeholder.markdown(collected)
+                    bot_response = collected
+
+                    # Reflect the full assistant message into our session history
+                    st.session_state.messages.append({
+                        'role': 'assistant',
+                        'content': bot_response
+                    })
+
+                    # Save bot message to database
+                    db_manager.save_message(
+                        st.session_state.participant_id,
+                        message_num,
+                        'bot',
+                        bot_response,
+                        contains_crisis_keyword=False
+                    )
+
             except Exception as e:
                 st.error(f"An error occurred: {e}")
                 st.error("Please try sending your message again.")

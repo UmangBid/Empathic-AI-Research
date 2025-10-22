@@ -38,16 +38,25 @@ class ChatInterface:
         # Try to capture external IDs from URL (Qualtrics/Prolific)
         captured_id = None
         try:
-            params = st.experimental_get_query_params()
-            # Streamlit returns lists for each key; take the first
+            # Use modern Streamlit API; behaves like a dict-like mapping
+            params = st.query_params
             candidates = []
             for key in (
                 'prolific_id', 'pid', 'PROLIFIC_PID', 'participant_id',
                 'rid', 'response_id', 'ResponseID', 'QUALTRICS_ID'
             ):
                 val = params.get(key)
-                if isinstance(val, list) and val and isinstance(val[0], str) and val[0].strip():
-                    candidates.append(val[0].strip())
+                # Accept either string or list[str] (for backward compatibility)
+                if isinstance(val, str):
+                    v = val.strip()
+                    if v:
+                        candidates.append(v)
+                elif isinstance(val, list) and val:
+                    first = val[0]
+                    if isinstance(first, str):
+                        v = first.strip()
+                        if v:
+                            candidates.append(v)
             if candidates:
                 captured_id = candidates[0]
                 # Initialize session_state if not already set
@@ -282,6 +291,18 @@ class ChatInterface:
         display: none !important;
         height: 0 !important;
         min-height: 0 !important;
+    }
+
+    /* Hide user avatar/menu and cloud badges (Streamlit Cloud) */
+    [data-testid="stUserMenu"],
+    [data-testid="stDecoration"],
+    .viewerBadge_link__container,
+    a.viewerBadge_link__kKQ2J,
+    a[href^="https://streamlit.io"],
+    a[href*="share.streamlit.io"] {
+        display: none !important;
+        visibility: hidden !important;
+        pointer-events: none !important;
     }
     
     /* Hide Streamlit branding and menu */

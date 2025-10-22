@@ -60,6 +60,7 @@ class BotManager:
         self.model = _get_cfg(self.config, ["api", "model"], "gpt-4")
         self.temperature = float(_get_cfg(self.config, ["api", "temperature"], 0.7))
         self.max_tokens = int(_get_cfg(self.config, ["api", "max_tokens"], 1024))
+        self.max_words = int(_get_cfg(self.config, ["api", "max_words"], 150))
 
         # Paths (support both ./config and project root)
         self.app_cfg_path = _first_existing_path(["config/app_config.yaml", "app_config.yaml"])
@@ -118,19 +119,31 @@ class BotManager:
                 }
 
         bot_type = sess["bot_type"]
-        system_prompt = self.prompts.get(bot_type, "")
+        base_prompt = self.prompts.get(bot_type, "")
+        # Add a concise-length policy so the model ends naturally, plus an anchor to maintain style
+        length_policy = (
+            f"Please keep responses concise, around {self.max_words} words, and finish your thought with a complete sentence."
+        )
+        anchor = ""
+        if base_prompt:
+            anchor = (
+                f" Maintain the {bot_type} empathy style consistently throughout this conversation. Do not switch styles or tones."
+            )
+        system_prompt = (base_prompt + "\n\n" + length_policy + anchor).strip() if base_prompt else length_policy
 
         # Build messages (system + history + current)
         messages = []
         if system_prompt:
             messages.append({"role": "system", "content": system_prompt})
         # include limited history (last 10 exchanges)
-        hist = sess["history"][-20:]
+        hist = sess["history"][-10:]
         messages.extend(hist)
         messages.append({"role": "user", "content": user_message})
 
         # Call the model
         reply = self._call_model(messages)
+        # Enforce approximate word cap with sentence-aware truncation as a fallback
+        reply = self._truncate_words_nicely(reply, self.max_words)
 
         # Update history
         sess["history"].append({"role": "user", "content": user_message})
@@ -141,6 +154,118 @@ class BotManager:
             "crisis_detected": False,
             "detected_keyword": None,
         }
+
+    # ---------- Crisis helper (public) ----------
+
+    def check_crisis(self, user_message: str) -> tuple[bool, Optional[str], Optional[str]]:
+        """Check a message for crisis keywords and return (is_crisis, keyword, crisis_text)."""
+        if not self.crisis:
+            return False, None, None
+        try:
+            is_crisis, detected_keyword = self.crisis.check_message(user_message)
+        except Exception:
+            return False, None, None
+        if is_crisis:
+            return True, detected_keyword, self._crisis_text()
+        return False, None, None
+
+    # ---------- Streaming responses ----------
+
+    def stream_bot_response(self, session_id: str, user_message: str):
+        """Yield assistant text chunks for a response, updating session history at the end.
+
+        This does NOT perform crisis detection; call check_crisis() before invoking streaming.
+        """
+        sess = self.sessions.get(session_id)
+        if not sess:
+            raise ValueError(f"Session not found: {session_id}")
+
+        bot_type = sess["bot_type"]
+        base_prompt = self.prompts.get(bot_type, "")
+        length_policy = (
+            f"Please keep responses concise, around {self.max_words} words, and finish your thought with a complete sentence."
+        )
+        anchor = ""
+        if base_prompt:
+            anchor = (
+                f" Maintain the {bot_type} empathy style consistently throughout this conversation. Do not switch styles or tones."
+            )
+        system_prompt = (base_prompt + "\n\n" + length_policy + anchor).strip() if base_prompt else length_policy
+
+        # Build messages (system + history + current)
+        messages = []
+        if system_prompt:
+            messages.append({"role": "system", "content": system_prompt})
+        hist = sess["history"][-10:]
+        messages.extend(hist)
+        messages.append({"role": "user", "content": user_message})
+
+        full = []
+        words_seen = 0
+        exceeded = False
+        try:
+            stream = self._client.chat.completions.create(
+                model=self.model or "gpt-4",
+                messages=messages,
+                temperature=self.temperature,
+                max_tokens=self.max_tokens,
+                stream=True,
+            )
+            for chunk in stream:
+                delta = getattr(getattr(chunk, "choices", [None])[0], "delta", None)
+                token = getattr(delta, "content", None) if delta else None
+                if token:
+                    full.append(token)
+                    yield token
+                    # Word-aware, sentence-friendly stop
+                    words_seen = len("".join(full).split())
+                    if not exceeded and words_seen >= self.max_words:
+                        exceeded = True
+                    if exceeded:
+                        txt = "".join(full)
+                        # If we've crossed the cap and see sentence end, stop
+                        if any(p in token for p in (".", "!", "?")):
+                            break
+                        # Hard stop if we go too far beyond (cap + 25 words)
+                        if words_seen >= self.max_words + 25:
+                            break
+        except Exception as e:
+            # On error, yield a single error string
+            yield f"I’m sorry, I ran into an error: {e}"
+
+        # Update history after streaming completes (best-effort)
+        try:
+            final = "".join(full)
+            final = self._truncate_words_nicely(final, self.max_words)
+            sess["history"].append({"role": "user", "content": user_message})
+            sess["history"].append({"role": "assistant", "content": final})
+        except Exception:
+            pass
+
+    # ---------- Utility ----------
+
+    @staticmethod
+    def _truncate_words_nicely(text: str, limit: int) -> str:
+        """Truncate around a word limit, preferring to end at sentence punctuation.
+
+        Strategy: if text exceeds `limit`, allow up to +20 extra words and
+        cut at the last ., !, or ? if present; otherwise cut at `limit`.
+        """
+        try:
+            text = text or ""
+            words = text.split()
+            if len(words) <= max(0, limit):
+                return text
+            # Build a buffer up to limit+20
+            upto = " ".join(words[: max(0, limit + 20)])
+            # Find last sentence boundary
+            last_punct = max(upto.rfind("."), upto.rfind("!"), upto.rfind("?"))
+            if last_punct != -1 and last_punct > 0:
+                return upto[: last_punct + 1].strip()
+            # Fallback: hard cut at limit
+            return " ".join(words[: max(0, limit)])
+        except Exception:
+            return text or ""
 
     def end_session(self, session_id: str, completed: bool = True):
         # Nothing fancy; just drop in-memory state
