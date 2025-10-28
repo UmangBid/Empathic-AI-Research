@@ -129,15 +129,19 @@ class BotManager:
             anchor = (
                 f" Maintain the {bot_type} empathy style consistently throughout this conversation. Do not switch styles or tones."
             )
-        system_prompt = (base_prompt + "\n\n" + length_policy + anchor).strip() if base_prompt else length_policy
+        # Add anti-repetition instruction
+        anti_repeat = (
+            " Review the full conversation history before responding. Do not repeat the same advice, suggestions, or phrasing you have already provided. "
+            "Build upon previous exchanges and offer new perspectives or information each time."
+        )
+        system_prompt = (base_prompt + "\n\n" + length_policy + anchor + anti_repeat).strip() if base_prompt else (length_policy + anti_repeat)
 
-        # Build messages (system + history + current)
+        # Build messages (system + FULL history + current) - send ALL conversation history
         messages = []
         if system_prompt:
             messages.append({"role": "system", "content": system_prompt})
-        # include limited history (last 10 exchanges)
-        hist = sess["history"][-10:]
-        messages.extend(hist)
+        # Send FULL history to maintain context across all 10 turns
+        messages.extend(sess["history"])
         messages.append({"role": "user", "content": user_message})
 
         # Call the model
@@ -190,14 +194,19 @@ class BotManager:
             anchor = (
                 f" Maintain the {bot_type} empathy style consistently throughout this conversation. Do not switch styles or tones."
             )
-        system_prompt = (base_prompt + "\n\n" + length_policy + anchor).strip() if base_prompt else length_policy
+        # Add anti-repetition instruction
+        anti_repeat = (
+            " Review the full conversation history before responding. Do not repeat the same advice, suggestions, or phrasing you have already provided. "
+            "Build upon previous exchanges and offer new perspectives or information each time."
+        )
+        system_prompt = (base_prompt + "\n\n" + length_policy + anchor + anti_repeat).strip() if base_prompt else (length_policy + anti_repeat)
 
-        # Build messages (system + history + current)
+        # Build messages (system + FULL history + current) - send ALL conversation history
         messages = []
         if system_prompt:
             messages.append({"role": "system", "content": system_prompt})
-        hist = sess["history"][-10:]
-        messages.extend(hist)
+        # Send FULL history to maintain context across all 10 turns
+        messages.extend(sess["history"])
         messages.append({"role": "user", "content": user_message})
 
         full = []
